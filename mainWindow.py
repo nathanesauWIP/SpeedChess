@@ -5,8 +5,18 @@ from pixmapCache import *
 
 pixmapCache = PixmapCache()
 
+
 class Square(QLabel):
-    clicked = pyqtSignal(int, int)
+    clicked = pyqtSignal(QLabel)
+
+    def refreshStyleSheet(self):
+        if (self.row + self.col) % 2:
+            self.setStyleSheet("background-color: white")
+        else:
+            self.setStyleSheet("background-color: brown")
+
+    def refreshPixmap(self):
+        self.setPixmap(pixmapCache.getPixmap(self.color, self.piece))
 
     def __init__(self, row, col, color, piece, parent=None):
         super().__init__(parent)
@@ -16,20 +26,15 @@ class Square(QLabel):
         self.color = color
         self.piece = piece
 
-        if (row + col) % 2:
-            self.setStyleSheet("background-color: white")
-        else:
-            self.setStyleSheet("background-color: brown")
-
-        pixmap = pixmapCache.getPixmap(color, piece)
-        self.setPixmap(pixmap)
+        self.refreshStyleSheet()
+        self.refreshPixmap()
 
     def mousePressEvent(self, event):
-        self.clicked.emit(self.row, self.col)
+        self.clicked.emit(self)
 
 
 class Board(QWidget):
-    def getInitialColorPiece(self, row, col):
+    def getInitialColorPiece(row, col):
         color = COLOR_BLACK if (row is 0 or row is 1) \
             else COLOR_WHITE if (row is 6 or row is 7) \
             else COLOR_NONE
@@ -48,19 +53,38 @@ class Board(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
         mainLayout = QGridLayout()  # 8 x 8
         for row in range(0, 8, 1):
             for col in range(0, 8, 1):
-                colorPiece = self.getInitialColorPiece(row, col)
+                colorPiece = Board.getInitialColorPiece(row, col)
                 square = Square(row, col, colorPiece[0], colorPiece[1])
                 square.clicked.connect(self.onClicked)
                 mainLayout.addWidget(square, row, col)
-
         self.setLayout(mainLayout)
 
-    def onClicked(self, row, col):
-        print(row, ", ", col, " clicked!")
+        self.highlightedSquare = None
 
+    def onClicked(self, square):
+        if self.highlightedSquare:
+            self.highlightedSquare.refreshStyleSheet()
+
+        if square.color is COLOR_WHITE or square.color is COLOR_BLACK:
+            square.setStyleSheet("background-color: lightblue")
+            self.highlightedSquare = square
+        else:  # try to move self.highlightedSquare to square
+            if self.highlightedSquare:
+                square.color = self.highlightedSquare.color
+                square.piece = self.highlightedSquare.piece
+                square.refreshPixmap()
+
+                if self.highlightedSquare.row is not square.row or \
+                        self.highlightedSquare.col is not square.col:
+                    self.highlightedSquare.color = COLOR_NONE
+                    self.highlightedSquare.piece = PIECE_NONE
+                    self.highlightedSquare.refreshPixmap()
+                
+                self.highlightedSquare = None
 
 class MainWindow(QMainWindow):
     def __init__(self, parent=None):
